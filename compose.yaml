@@ -1,0 +1,27 @@
+services:
+  crud:
+    container_name: crud
+    build: . 
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: "host=db user=postgres password=postgres dbname=crud sslmode=disable"
+    develop: 
+      watch:
+        - action: rebuild
+          path: .
+          target: /app
+  db:
+    container_name: db
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: crud
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata: {}
