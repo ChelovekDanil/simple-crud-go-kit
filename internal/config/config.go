@@ -8,20 +8,12 @@ import (
 
 type Config struct {
 	Server struct {
-		Port string `yaml:"server"`
-	} `yaml:"server"`
-	Database struct {
-		User string `yaml:"user"`
-		Pass string `yaml:"pass"`
-		Host string `yaml:"host"`
 		Port string `yaml:"port"`
-		Name string `yaml:"name"`
-		Db   string `yaml:"db"`
-	} `yaml:"database"`
+	} `yaml:"server"`
 }
 
 const (
-	configPath = "/home/asscamper/godir/crud/configs/config.yaml"
+	configPath = "/app/config/config.yaml"
 )
 
 func MustLoad() *Config {
