@@ -42,7 +42,7 @@ func (u *User) Get(ctx context.Context, id string) (*User, error) {
 		conn.Disconnect(ctx)
 	}(ctx)
 
-	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
 	filter := bson.D{{Key: "_id", Value: id}}
 	var user User
 
@@ -63,7 +63,7 @@ func (u *User) GetAll(ctx context.Context) ([]User, error) {
 		conn.Disconnect(ctx)
 	}(ctx)
 
-	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
 	filter := bson.D{{}}
 
 	cursor, err := collection.Find(ctx, filter)
@@ -88,7 +88,7 @@ func (u *User) Create(ctx context.Context, user User) (string, error) {
 		conn.Disconnect(ctx)
 	}(ctx)
 
-	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
 	id := uuid.New()
 
 	_, err = collection.InsertOne(ctx, User{Id: id.String(), FirstName: user.FirstName, LastName: user.LastName})
@@ -108,7 +108,7 @@ func (u *User) Update(ctx context.Context, user User) error {
 		conn.Disconnect(ctx)
 	}(ctx)
 
-	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
 	filter := bson.M{"_id": user.Id}
 	update := bson.M{
 		"$set": bson.M{
@@ -134,7 +134,7 @@ func (u *User) Delete(ctx context.Context, id string) error {
 		conn.Disconnect(ctx)
 	}(ctx)
 
-	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
 	filter := bson.M{"_id": id}
 
 	_, err = collection.DeleteOne(ctx, filter)

@@ -2,6 +2,10 @@ services:
   crud:
     container_name: crud
     build: . 
+    environment:
+      PORT: 8080
+      MONGO_URI: mongodb://mongo:27017
+      DBNAME_ENV: crud
     ports:
       - "8080:8080"
     develop: 
@@ -9,16 +13,7 @@ services:
         - action: rebuild
           path: .
           target: /app
-  db:
-    container_name: db
-    image: mongo:latest
-    environment:
-      MONGO_URI: "mongodb://localhost:27017"
-      DBNAME: "crud"
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodata:/var/lib/postgresql/data
-
-volumes:
-  mongodata: {}
+  mongo:
+    container_name: mongo
+    image: mongo
+    restart: always

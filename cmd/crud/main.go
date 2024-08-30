@@ -8,12 +8,19 @@ import (
 	"syscall"
 
 	"github.com/chelovekdanil/crud"
-	"github.com/chelovekdanil/crud/internal/config"
 	"github.com/go-kit/log"
 )
 
+const (
+	defaultServerPort = "8080"
+	PORT_ENV          = "PORT"
+)
+
 func main() {
-	cfg := config.MustLoad()
+	var port string
+	if port = os.Getenv(PORT_ENV); port == "" {
+		port = defaultServerPort
+	}
 
 	var logger log.Logger
 	{
@@ -41,8 +48,8 @@ func main() {
 	}()
 
 	go func() {
-		logger.Log("transport", "HTTP", "addr", ":"+cfg.Server.Port)
-		errs <- http.ListenAndServe(":"+cfg.Server.Port, h)
+		logger.Log("transport", "HTTP", "addr", ":"+port)
+		errs <- http.ListenAndServe(":"+port, h)
 	}()
 
 	logger.Log("exit", <-errs)
