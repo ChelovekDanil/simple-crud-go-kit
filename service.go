@@ -2,15 +2,16 @@ package crud
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/chelovekdanil/crud/database"
-	_ "github.com/lib/pq"
+	"github.com/google/uuid"
 )
 
 type Service interface {
 	Get(ctx context.Context, id string) (*User, error)
 	GetAll(ctx context.Context) ([]User, error)
-	Create(ctx context.Context, user User) (int, error)
+	Create(ctx context.Context, user User) (string, error)
 	Update(ctx context.Context, user User) error
 	Delete(ctx context.Context, id string) error
 }
@@ -26,109 +27,127 @@ func NewService() Service {
 	return &User{}
 }
 
+const (
+	COLLECTION_NAME = "users"
+	DBNAME_ENV      = "DBNAME"
+)
+
 // Get - returns user by id
 func (u *User) Get(ctx context.Context, id string) (*User, error) {
-	conn, err := database.Connect()
+	rdb, err := database.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer rdb.Close()
 
-	var firstName string
-	var lastName string
-
-	quary := "SELECT first_name, last_name FROM users WHERE id = $1;"
-
-	err = conn.QueryRowContext(ctx, quary, id).Scan(&firstName, &lastName)
+	res, err := rdb.Get(ctx, id).Result()
 	if err != nil {
 		return nil, err
 	}
-	return &User{id, firstName, lastName}, nil
+
+	var data User
+	err = json.Unmarshal([]byte(res), &data)
+	if err != nil {
+		return nil, err
+	}
+	return &User{Id: id, FirstName: data.FirstName, LastName: data.LastName}, nil
 }
 
 // GetAll - return all user
 func (u *User) GetAll(ctx context.Context) ([]User, error) {
-	conn, err := database.Connect()
+	rdb, err := database.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer rdb.Close()
+
+	var cursor uint64
+	var keys []string
+	for {
+		newKey, cursor, err := rdb.Scan(ctx, cursor, "*", 0).Result()
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, newKey...)
+
+		if cursor == 0 {
+			break
+		}
+	}
 
 	var users []User
+	for _, key := range keys {
+		res, err := rdb.Get(ctx, key).Result()
+		if err != nil {
+			return nil, err
+		}
 
-	rows, err := conn.QueryContext(ctx, "SELECT id, first_name, last_name FROM users;")
-	if err != nil {
-		return nil, err
+		var data User
+		err = json.Unmarshal([]byte(res), &data)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, User{Id: key, FirstName: data.FirstName, LastName: data.LastName})
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id string
-		var firstName string
-		var lastName string
-
-		rows.Scan(&id, &firstName, &lastName)
-		users = append(users, User{id, firstName, lastName})
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
 	return users, nil
 }
 
 // Create - created a new user
-func (u *User) Create(ctx context.Context, user User) (int, error) {
-	conn, err := database.Connect()
+func (u *User) Create(ctx context.Context, user User) (id string, err error) {
+	rdb, err := database.Connect(ctx)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	defer conn.Close()
+	defer rdb.Close()
 
-	var id int
-	query := "INSERT INTO users(first_name, last_name) VALUES($1, $2) RETURNING id"
-
-	err = conn.QueryRowContext(ctx, query, user.FirstName, user.LastName).Scan(&id)
+	insertData := User{
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+	}
+	jsonData, err := json.Marshal(insertData)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-
+	id = uuid.New().String()
+	err = rdb.Set(ctx, id, jsonData, 0).Err()
+	if err != nil {
+		return "", err
+	}
 	return id, nil
 }
 
 // Update - updates the user
 func (u *User) Update(ctx context.Context, user User) error {
-	conn, err := database.Connect()
+	rdb, err := database.Connect(ctx)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer rdb.Close()
 
-	quary := "UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3;"
-
-	err = conn.QueryRowContext(ctx, quary, user.FirstName, user.LastName, user.Id).Scan()
+	insertData := User{
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+	}
+	jsonData, err := json.Marshal(insertData)
 	if err != nil {
 		return err
 	}
-
+	if err = rdb.Set(ctx, user.Id, jsonData, 0).Err(); err != nil {
+		return err
+	}
 	return nil
 }
 
 // Delete - delete the user
 func (u *User) Delete(ctx context.Context, id string) error {
-	conn, err := database.Connect()
+	rdb, err := database.Connect(ctx)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer rdb.Close()
 
-	quary := "DELETE FROM users WHERE id = $1;"
-
-	err = conn.QueryRowContext(ctx, quary, id).Scan()
-	if err != nil {
+	if err = rdb.Del(ctx, id).Err(); err != nil {
 		return err
 	}
-
 	return nil
 }

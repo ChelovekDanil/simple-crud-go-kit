@@ -1,17 +1,25 @@
 package database
 
 import (
-	"database/sql"
-	"fmt"
+	"context"
 	"os"
+
+	"github.com/redis/go-redis/v9"
+)
+
+const (
+	defaultRedisURI = "localhost:6379"
+	RedisURI        = "REDIS_URI"
 )
 
 // Connect return connection in database
-func Connect() (*sql.DB, error) {
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		return nil, fmt.Errorf("cannot connect to db: %s", err)
+func Connect(ctx context.Context) (*redis.Client, error) {
+	var redisUri string
+	if redisUri = os.Getenv(RedisURI); redisUri == "" {
+		redisUri = defaultRedisURI
 	}
-
-	return db, nil
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisUri,
+	})
+	return rdb, nil
 }
