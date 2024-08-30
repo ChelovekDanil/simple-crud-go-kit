@@ -1,17 +1,19 @@
 package database
 
 import (
-	"database/sql"
-	"fmt"
-	"os"
+	"context"
+
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // Connect return connection in database
-func Connect() (*sql.DB, error) {
-	db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
-	if err != nil {
-		return nil, fmt.Errorf("cannot connect to db: %s", err)
-	}
+func Connect(ctx context.Context) (*mongo.Client, error) {
+	clientOptions := options.Client().ApplyURI("mongodb://localhost:27017")
 
-	return db, nil
+	conn, err := mongo.Connect(ctx, clientOptions)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
 }

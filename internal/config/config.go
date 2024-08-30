@@ -13,7 +13,7 @@ type Config struct {
 }
 
 const (
-	configPath = "/app/config/config.yaml"
+	configPath = "/home/asscamper/godir/crud/configs/config.yaml"
 )
 
 func MustLoad() *Config {
