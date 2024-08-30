@@ -2,10 +2,10 @@ package crud
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/chelovekdanil/crud/database"
 	"github.com/google/uuid"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Service interface {
@@ -17,9 +17,9 @@ type Service interface {
 }
 
 type User struct {
-	Id        string `json:"id" bson:"_id"`
-	FirstName string `json:"firstName" bson:"firstName"`
-	LastName  string `json:"lastName" bson:"lastName"`
+	Id        string `json:"id"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
 }
 
 // NewService - create type Service
@@ -34,91 +34,105 @@ const (
 
 // Get - returns user by id
 func (u *User) Get(ctx context.Context, id string) (*User, error) {
-	conn, err := database.Connect(ctx)
+	rdb, err := database.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func(ctx context.Context) {
-		conn.Disconnect(ctx)
-	}(ctx)
+	defer rdb.Close()
 
-	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
-	filter := bson.D{{Key: "_id", Value: id}}
-	var user User
-
-	err = collection.FindOne(ctx, filter).Decode(&user)
+	res, err := rdb.Get(ctx, id).Result()
 	if err != nil {
 		return nil, err
 	}
-	return &User{Id: user.Id, FirstName: user.FirstName, LastName: user.LastName}, nil
+
+	var data User
+	err = json.Unmarshal([]byte(res), &data)
+	if err != nil {
+		return nil, err
+	}
+	return &User{Id: id, FirstName: data.FirstName, LastName: data.LastName}, nil
 }
 
 // GetAll - return all user
 func (u *User) GetAll(ctx context.Context) ([]User, error) {
-	conn, err := database.Connect(ctx)
+	rdb, err := database.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func(ctx context.Context) {
-		conn.Disconnect(ctx)
-	}(ctx)
+	defer rdb.Close()
 
-	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
-	filter := bson.D{{}}
+	var cursor uint64
+	var keys []string
+	for {
+		newKey, cursor, err := rdb.Scan(ctx, cursor, "*", 0).Result()
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, newKey...)
 
-	cursor, err := collection.Find(ctx, filter)
-	if err != nil {
-		return nil, err
+		if cursor == 0 {
+			break
+		}
 	}
 
 	var users []User
-	if err = cursor.All(ctx, &users); err != nil {
-		return nil, err
+	for _, key := range keys {
+		res, err := rdb.Get(ctx, key).Result()
+		if err != nil {
+			return nil, err
+		}
+
+		var data User
+		err = json.Unmarshal([]byte(res), &data)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, User{Id: key, FirstName: data.FirstName, LastName: data.LastName})
 	}
 	return users, nil
 }
 
 // Create - created a new user
-func (u *User) Create(ctx context.Context, user User) (string, error) {
-	conn, err := database.Connect(ctx)
+func (u *User) Create(ctx context.Context, user User) (id string, err error) {
+	rdb, err := database.Connect(ctx)
 	if err != nil {
 		return "", err
 	}
-	defer func(ctx context.Context) {
-		conn.Disconnect(ctx)
-	}(ctx)
+	defer rdb.Close()
 
-	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
-	id := uuid.New()
-
-	_, err = collection.InsertOne(ctx, User{Id: id.String(), FirstName: user.FirstName, LastName: user.LastName})
+	insertData := User{
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
+	}
+	jsonData, err := json.Marshal(insertData)
 	if err != nil {
 		return "", err
 	}
-	return id.String(), nil
+	id = uuid.New().String()
+	err = rdb.Set(ctx, id, jsonData, 0).Err()
+	if err != nil {
+		return "", err
+	}
+	return id, nil
 }
 
 // Update - updates the user
 func (u *User) Update(ctx context.Context, user User) error {
-	conn, err := database.Connect(ctx)
+	rdb, err := database.Connect(ctx)
 	if err != nil {
 		return err
 	}
-	defer func(ctx context.Context) {
-		conn.Disconnect(ctx)
-	}(ctx)
+	defer rdb.Close()
 
-	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
-	filter := bson.M{"_id": user.Id}
-	update := bson.M{
-		"$set": bson.M{
-			"firstName": user.FirstName,
-			"lastName":  user.LastName,
-		},
+	insertData := User{
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
 	}
-
-	_, err = collection.UpdateOne(ctx, filter, update)
+	jsonData, err := json.Marshal(insertData)
 	if err != nil {
+		return err
+	}
+	if err = rdb.Set(ctx, user.Id, jsonData, 0).Err(); err != nil {
 		return err
 	}
 	return nil
@@ -126,19 +140,13 @@ func (u *User) Update(ctx context.Context, user User) error {
 
 // Delete - delete the user
 func (u *User) Delete(ctx context.Context, id string) error {
-	conn, err := database.Connect(ctx)
+	rdb, err := database.Connect(ctx)
 	if err != nil {
 		return err
 	}
-	defer func(ctx context.Context) {
-		conn.Disconnect(ctx)
-	}(ctx)
+	defer rdb.Close()
 
-	collection := conn.Database(DBNAME_ENV).Collection(COLLECTION_NAME)
-	filter := bson.M{"_id": id}
-
-	_, err = collection.DeleteOne(ctx, filter)
-	if err != nil {
+	if err = rdb.Del(ctx, id).Err(); err != nil {
 		return err
 	}
 	return nil

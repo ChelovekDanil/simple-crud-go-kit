@@ -2,30 +2,24 @@ package database
 
 import (
 	"context"
-	"log"
 	"os"
 
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
-	defaultMongoURI = "mongodb://localhost:27017"
-	MongoURI        = "MONGO_URI"
+	defaultRedisURI = "localhost:6379"
+	RedisURI        = "REDIS_URI"
 )
 
 // Connect return connection in database
-func Connect(ctx context.Context) (*mongo.Client, error) {
-	var mongoUri string
-	if mongoUri = os.Getenv(MongoURI); mongoUri == "" {
-		mongoUri = defaultMongoURI
+func Connect(ctx context.Context) (*redis.Client, error) {
+	var redisUri string
+	if redisUri = os.Getenv(RedisURI); redisUri == "" {
+		redisUri = defaultRedisURI
 	}
-	log.Println(mongoUri)
-	clientOptions := options.Client().ApplyURI(mongoUri)
-
-	conn, err := mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		return nil, err
-	}
-	return conn, nil
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisUri,
+	})
+	return rdb, nil
 }
