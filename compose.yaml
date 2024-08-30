@@ -4,8 +4,6 @@ services:
     build: . 
     ports:
       - "8080:8080"
-    environment:
-      DATABASE_URL: "host=db user=postgres password=postgres dbname=crud sslmode=disable"
     develop: 
       watch:
         - action: rebuild
@@ -13,16 +11,14 @@ services:
           target: /app
   db:
     container_name: db
-    image: postgres:latest
+    image: mongo:latest
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: crud
+      MONGO_URI: "mongodb://localhost:27017"
+      DBNAME: "crud"
     ports:
-      - "5432:5432"
+      - "27017:27017"
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-      - pgdata:/var/lib/postgresql/data
+      - mongodata:/var/lib/postgresql/data
 
 volumes:
-  pgdata: {}
+  mongodata: {}

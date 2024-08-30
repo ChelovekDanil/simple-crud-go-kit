@@ -4,21 +4,22 @@ import (
 	"context"
 
 	"github.com/chelovekdanil/crud/database"
-	_ "github.com/lib/pq"
+	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type Service interface {
 	Get(ctx context.Context, id string) (*User, error)
 	GetAll(ctx context.Context) ([]User, error)
-	Create(ctx context.Context, user User) (int, error)
+	Create(ctx context.Context, user User) (string, error)
 	Update(ctx context.Context, user User) error
 	Delete(ctx context.Context, id string) error
 }
 
 type User struct {
-	Id        string `json:"id"`
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
+	Id        string `json:"id" bson:"_id"`
+	FirstName string `json:"firstName" bson:"firstName"`
+	LastName  string `json:"lastName" bson:"lastName"`
 }
 
 // NewService - create type Service
@@ -26,109 +27,119 @@ func NewService() Service {
 	return &User{}
 }
 
+const (
+	COLLECTION_NAME = "users"
+	DBNAME_ENV      = "DBNAME"
+)
+
 // Get - returns user by id
 func (u *User) Get(ctx context.Context, id string) (*User, error) {
-	conn, err := database.Connect()
+	conn, err := database.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func(ctx context.Context) {
+		conn.Disconnect(ctx)
+	}(ctx)
 
-	var firstName string
-	var lastName string
+	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	filter := bson.D{{Key: "_id", Value: id}}
+	var user User
 
-	quary := "SELECT first_name, last_name FROM users WHERE id = $1;"
-
-	err = conn.QueryRowContext(ctx, quary, id).Scan(&firstName, &lastName)
+	err = collection.FindOne(ctx, filter).Decode(&user)
 	if err != nil {
 		return nil, err
 	}
-	return &User{id, firstName, lastName}, nil
+	return &User{Id: user.Id, FirstName: user.FirstName, LastName: user.LastName}, nil
 }
 
 // GetAll - return all user
 func (u *User) GetAll(ctx context.Context) ([]User, error) {
-	conn, err := database.Connect()
+	conn, err := database.Connect(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func(ctx context.Context) {
+		conn.Disconnect(ctx)
+	}(ctx)
+
+	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	filter := bson.D{{}}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
 
 	var users []User
-
-	rows, err := conn.QueryContext(ctx, "SELECT id, first_name, last_name FROM users;")
-	if err != nil {
+	if err = cursor.All(ctx, &users); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var id string
-		var firstName string
-		var lastName string
-
-		rows.Scan(&id, &firstName, &lastName)
-		users = append(users, User{id, firstName, lastName})
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-
 	return users, nil
 }
 
 // Create - created a new user
-func (u *User) Create(ctx context.Context, user User) (int, error) {
-	conn, err := database.Connect()
+func (u *User) Create(ctx context.Context, user User) (string, error) {
+	conn, err := database.Connect(ctx)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-	defer conn.Close()
+	defer func(ctx context.Context) {
+		conn.Disconnect(ctx)
+	}(ctx)
 
-	var id int
-	query := "INSERT INTO users(first_name, last_name) VALUES($1, $2) RETURNING id"
+	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	id := uuid.New()
 
-	err = conn.QueryRowContext(ctx, query, user.FirstName, user.LastName).Scan(&id)
+	_, err = collection.InsertOne(ctx, User{Id: id.String(), FirstName: user.FirstName, LastName: user.LastName})
 	if err != nil {
-		return 0, err
+		return "", err
 	}
-
-	return id, nil
+	return id.String(), nil
 }
 
 // Update - updates the user
 func (u *User) Update(ctx context.Context, user User) error {
-	conn, err := database.Connect()
+	conn, err := database.Connect(ctx)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func(ctx context.Context) {
+		conn.Disconnect(ctx)
+	}(ctx)
 
-	quary := "UPDATE users SET first_name = $1, last_name = $2 WHERE id = $3;"
+	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	filter := bson.M{"_id": user.Id}
+	update := bson.M{
+		"$set": bson.M{
+			"firstName": user.FirstName,
+			"lastName":  user.LastName,
+		},
+	}
 
-	err = conn.QueryRowContext(ctx, quary, user.FirstName, user.LastName, user.Id).Scan()
+	_, err = collection.UpdateOne(ctx, filter, update)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
 // Delete - delete the user
 func (u *User) Delete(ctx context.Context, id string) error {
-	conn, err := database.Connect()
+	conn, err := database.Connect(ctx)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func(ctx context.Context) {
+		conn.Disconnect(ctx)
+	}(ctx)
 
-	quary := "DELETE FROM users WHERE id = $1;"
+	collection := conn.Database("crud").Collection(COLLECTION_NAME)
+	filter := bson.M{"_id": id}
 
-	err = conn.QueryRowContext(ctx, quary, id).Scan()
+	_, err = collection.DeleteOne(ctx, filter)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
