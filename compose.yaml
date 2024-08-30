@@ -4,8 +4,7 @@ services:
     build: . 
     environment:
       PORT: 8080
-      MONGO_URI: mongodb://mongo:27017
-      DBNAME_ENV: crud
+      REDIS_URI: redis:6379
     ports:
       - "8080:8080"
     develop: 
@@ -13,7 +12,6 @@ services:
         - action: rebuild
           path: .
           target: /app
-  mongo:
-    container_name: mongo
-    image: mongo
-    restart: always
+  redis:
+    container_name: redis
+    image: redis:latest

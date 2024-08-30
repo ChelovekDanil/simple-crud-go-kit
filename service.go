@@ -27,11 +27,6 @@ func NewService() Service {
 	return &User{}
 }
 
-const (
-	COLLECTION_NAME = "users"
-	DBNAME_ENV      = "DBNAME"
-)
-
 // Get - returns user by id
 func (u *User) Get(ctx context.Context, id string) (*User, error) {
 	rdb, err := database.Connect(ctx)
