@@ -2,7 +2,6 @@ package crud
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/go-kit/kit/endpoint"
 )
@@ -29,14 +28,20 @@ func makeGetEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(requestWithId)
 		user, err := s.Get(ctx, req.Id)
-		return getResponse{*user, err}, nil
+		if err != nil {
+			return nil, err
+		}
+		return getResponse{*user}, err
 	}
 }
 
 func makeGetAllEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, _ interface{}) (interface{}, error) {
 		users, err := s.GetAll(ctx)
-		return getAllResponse{users, err}, nil
+		if err != nil {
+			return nil, err
+		}
+		return getAllResponse{users}, nil
 	}
 }
 
@@ -44,7 +49,10 @@ func makeCreateEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(createRequest)
 		id, err := s.Create(ctx, User{FirstName: req.User.FirstName, LastName: req.User.LastName})
-		return createResponse{User{Id: strconv.Itoa(int(id)), FirstName: req.User.FirstName, LastName: req.User.LastName}, err}, nil
+		if err != nil {
+			return nil, err
+		}
+		return createResponse{User{Id: id, FirstName: req.User.FirstName, LastName: req.User.LastName}}, nil
 	}
 }
 
@@ -52,7 +60,10 @@ func makeUpdateEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(updateRequest)
 		err := s.Update(ctx, req.User)
-		return updateResponse{Err: err}, nil
+		if err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
 }
 
@@ -60,7 +71,10 @@ func makeDeleteEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (interface{}, error) {
 		req := request.(requestWithId)
 		err := s.Delete(ctx, req.Id)
-		return deleteResponse{Err: err}, nil
+		if err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
 }
 
@@ -69,13 +83,11 @@ type requestWithId struct {
 }
 
 type getResponse struct {
-	User User  `json:"user,omitempty"`
-	Err  error `json:"error,omitempty"`
+	User User `json:"user,omitempty"`
 }
 
 type getAllResponse struct {
 	Users []User `json:"users,omitempty"`
-	Err   error  `json:"error,omitempty"`
 }
 
 type createRequest struct {
@@ -83,18 +95,9 @@ type createRequest struct {
 }
 
 type createResponse struct {
-	User User  `json:"user,omitempty"`
-	Err  error `json:"error,omitempty"`
+	User User `json:"user,omitempty"`
 }
 
 type updateRequest struct {
 	User User
-}
-
-type updateResponse struct {
-	Err error `json:"error,omitempty"`
-}
-
-type deleteResponse struct {
-	Err error `json:"error,omitempty"`
 }

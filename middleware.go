@@ -37,7 +37,7 @@ func (mw loggerMiddleware) GetAll(ctx context.Context) (users []User, err error)
 	return mw.next.GetAll(ctx)
 }
 
-func (mw loggerMiddleware) Create(ctx context.Context, user User) (id int, err error) {
+func (mw loggerMiddleware) Create(ctx context.Context, user User) (id string, err error) {
 	defer func(t time.Time) {
 		mw.logger.Log("method", "Create", "first name", user.FirstName, "last name", user.LastName, "time", time.Since(t), "error", err)
 	}(time.Now())
